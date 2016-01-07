@@ -1,0 +1,282 @@
+/*
+Etherwulf's Outworld Lighting System 
+
+Copyright (c) 2016 Christopher Lum
+
+Do what you want with this code as long as there is proper
+attribution. However, no commercial use is permitted without
+express permission. I am also not liable for any 
+damages that might result from the use of this code.
+
+If you are reposting this code, please add a link back 
+to the original thread on formiculture.com or instructables.com
+
+
+*/
+
+//===============================================================
+// Libraries
+//===============================================================
+#include <Wire.h>
+#include <RTClib.h>
+#include <LEDFader.h>
+
+ //===============================================================
+// Global Variables & Constants
+//===============================================================
+#define LED_NUM 3
+
+LEDFader leds[LED_NUM] = {
+  LEDFader(3),
+  LEDFader(5),
+  LEDFader(6),
+};
+
+RTC_DS1307 RTC;
+
+int Rled = 6;
+int Gled = 3;
+int Bled = 5;
+int btnPin = 7;
+int GIndicator=9; //Bicolor led
+int RIndicator=8;  //Bicolor led
+int LDR = A6;
+int LDRvalue;
+boolean btnPressed = false;
+int mode;
+
+// Color sets
+//Add new crossfades like such: 
+//DawnOneToDawnTwo[5]={PrevRed,PrevGreen,PrevBlue,NextRed,NextGreen,NextBlue}
+//Remember to change values for the previous set
+
+int BlackToDawnOne[6] = {9, 0, 8, 44, 7, 0};
+int DawnOneToDawnTwo[6] = { 44, 7, 0, 47, 16, 0};
+int DawnTwoToDawnThree[6] = { 47, 16, 0, 63, 24, 2};
+int DawnThreeToDawnFour[6] = { 63, 24, 2, 71, 31, 0 };
+int DawnFourToNoonOne[6] = {71, 31, 0 ,86, 59, 24 };
+int NoonOneToNoonTwo[6] = { 86, 59, 24,86, 71, 27};
+int NoonTwoToNoonThree[6] = { 86, 71, 27, 78, 63, 27};
+int NoonThreeToEveningOne[6] = {78, 63, 27, 78, 55, 20 };
+int EveningOneToEveningTwo[6] = {78, 55, 20, 70, 31, 8};
+int EveningTwoToEveningThree[6] = { 70, 31, 8, 63, 24, 2};
+int EveningThreeToDuskOne[6] = {63, 24, 2, 47, 16, 0};
+int DuskOneToDuskTwo[6] = {47, 16, 0, 44, 7, 0};
+int DuskTwoToBlack[6] = {44, 7, 0, 9, 0, 8};
+
+int hours;
+float TotalSecondsFrac;
+
+long previoustempms = 0;
+long tempint = 1000;
+
+//===============================================================
+// SETUP
+//===============================================================
+void setup () {
+    Serial.begin(57600);
+    Wire.begin();
+    RTC.begin();
+    pinMode(RIndicator,OUTPUT);
+    pinMode(GIndicator,OUTPUT);
+    pinMode(Rled, OUTPUT);
+    pinMode(Gled, OUTPUT);
+    pinMode(Bled, OUTPUT);
+    pinMode(LDR,INPUT);
+    // following line sets the RTC to the date & time this sketch was compiled
+   // RTC.adjust(DateTime(__DATE__, __TIME__));
+  //RTC.adjust(DateTime(2015, 12, 18, 22, 40, 0));
+}
+
+ //===============================================================
+// Main Loop
+//===============================================================
+void loop () {
+
+//Increment mode on depress, unless mode = 1, then reset to 0
+boolean btnPressedNew = digitalRead(btnPin);
+if (btnPressed && btnPressedNew == LOW){
+mode++;
+digitalWrite(RIndicator,LOW); //Bicolor led is red when system is inactive
+digitalWrite(GIndicator,HIGH);  //Bicolor led blinks green when mode is changed
+delay(200);
+digitalWrite(GIndicator,LOW);   //Bicolor led is off when system is active
+}
+
+//Assign button state
+btnPressed = btnPressedNew;
+  
+switch (mode) {
+ 
+  case 1: 
+analogWrite(Rled, 255);
+analogWrite(Gled, 255);
+analogWrite(Bled, 50);
+
+  break;
+  
+ case 2: 
+ {
+  LDRvalue=analogRead(LDR);
+  float LDRdiff = (1023 - LDRvalue);
+  float LDRFrac1 = (LDRdiff/1023)*255;
+  float LDRFrac2 = (LDRdiff/1023)*255;
+  float LDRFrac3 = (LDRdiff/1023)*50;
+  int SetVal1 = (int)LDRFrac1+30;
+   int SetVal2 = (int)LDRFrac2+30;
+  int SetVal3 = (int)LDRFrac3+20;
+   analogWrite(Rled,SetVal1);
+  analogWrite(Gled,SetVal2);
+  analogWrite(Bled,SetVal3);
+ }
+  
+  break;
+    
+    case 3:
+	
+CheckTime();
+if (hours==7){
+  crossFade(BlackToDawnOne);
+}
+else if (hours==8){
+ crossFade(DawnOneToDawnTwo);
+}
+else if (hours==9){
+ crossFade(DawnTwoToDawnThree);
+}
+else if (hours==10){
+ crossFade(DawnThreeToDawnFour);
+}
+else if (hours==11){
+ crossFade(DawnFourToNoonOne);
+}
+else if (hours==12){
+ crossFade(NoonOneToNoonTwo);
+}
+else if (hours==13){
+ crossFade(NoonTwoToNoonThree);
+}
+else if (hours==14){
+ crossFade(NoonThreeToEveningOne);
+}
+else if (hours==15){
+ crossFade(EveningOneToEveningTwo);
+}
+else if (hours==16){
+ crossFade(EveningTwoToEveningThree);
+}
+else if (hours==17){
+   crossFade(EveningThreeToDuskOne);
+}
+else if (hours==18){
+ crossFade(DuskOneToDuskTwo);
+}
+else if (hours==19){
+ crossFade(DuskTwoToBlack);
+}
+else if (hours > 19 || hours < 6){
+ analogWrite(Rled,220);
+  analogWrite(Gled,0);
+ analogWrite(Bled, 5);
+
+}
+
+  break;
+  case 4: 
+
+  // Update all LEDs and start new fades if any are done
+  for (byte i = 0; i < LED_NUM; i++) {
+    LEDFader *led = &leds[i];
+    led->update();
+
+    // Set new fade
+    if (led->is_fading() == false) {
+      int duration = random(1000, 3000); // between 1 - 3 seconds
+
+      // Up
+      if (led->get_value() == 0) {
+        byte color = random(100, 255);
+        led->fade(color, duration);
+      }
+      // Down
+      else {
+        led->fade(0, duration);
+      }
+    }
+  }
+  break;
+  
+   default:
+ mode = 0;
+ // loop back to 0 by default
+analogWrite(Rled, 0);
+analogWrite(Bled, 0);
+analogWrite(Gled, 0);
+digitalWrite(RIndicator,HIGH);
+
+ break;
+}
+
+
+
+}
+
+//===============================================================
+// Subroutine
+//===============================================================
+void CheckTime() {
+  unsigned long currentMillis = millis();
+  if(currentMillis - previoustempms > tempint) {
+    GetTime();
+  }
+}
+
+void GetTime() {
+    DateTime now = RTC.now();
+
+    hours=now.hour();
+    int minutes=now.minute();
+    int seconds=now.second();
+    
+    float TotalSeconds = (minutes*60)+seconds;
+    TotalSecondsFrac = TotalSeconds/3600;
+      
+}
+
+void crossFade(int color[6]) {
+  
+// Convert to 0-255
+int PrevRed = (color[0] * 255) / 100;
+int PrevGreen = (color[1] * 255) / 100;
+int PrevBlue = (color[2] * 255) / 100;
+int NextRed = (color[3] * 255) / 100;
+int NextGreen = (color[4] * 255) / 100;
+int NextBlue = (color[5] * 255) / 100;
+
+//Calculate difference between RGB values of previous state and next state
+int RedDiff = (NextRed-PrevRed);
+int GreenDiff = (NextGreen-PrevGreen);
+int BlueDiff = (NextBlue-PrevBlue);
+
+//Calculates change necesssary for each led based on how many seconds have passed in that hour
+int Rchange = TotalSecondsFrac*RedDiff;
+int Gchange = TotalSecondsFrac*GreenDiff;
+int Bchange = TotalSecondsFrac*BlueDiff;
+
+//Calculates the value that each led should be at based on how many seconds have passed in that hour
+int RedIntensity = Rchange + PrevRed;
+int GreenIntensity = Gchange + PrevGreen;
+int BlueIntensity = Bchange +PrevBlue;
+
+//Updates the value for each led
+
+analogWrite(Rled, RedIntensity);
+analogWrite(Gled, GreenIntensity);
+analogWrite(Bled, BlueIntensity);
+
+Serial.println(TotalSecondsFrac);
+Serial.println(RedIntensity);
+Serial.println(GreenIntensity);
+Serial.println(BlueIntensity);
+
+}
