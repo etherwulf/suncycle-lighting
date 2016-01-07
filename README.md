@@ -2,6 +2,10 @@
 This is an intelligent lighting system for terrariums and aquariums. It's main aim is to mimic a day/night cycle as closely as possible.
 For more information on schematics and assembly, please refer to http://www.instructables.com/id/Intelligent-Lighting-System-for-TerrariumsAquarium/.
 
+Libaries needed:
+LEDFader - https://github.com/jgillick/arduino-LEDFader
+RTClib - https://github.com/adafruit/RTClib
+
 Modes so far:
 
 1. Day/Night
